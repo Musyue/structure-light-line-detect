@@ -1,0 +1,42 @@
+        s1_plane2 = (puv_plane2 - self.u0 * math.sin(theta_uv_plane2) - self.v0 * math.cos(theta_uv_plane2)) * self.pu * self.pv / (self.f * ((self.pv * math.sin(theta_uv_plane2)) ** 2 + (self.pu * math.cos(theta_uv_plane2)) **2) ** 0.5)
+        #define line_jacob1
+        s2_plane2 = math.sin(theta_uv_plane2) / (math.sin(theta_uv_plane2) ** 2 + (self.pu / self.pv * math.cos(theta_uv_plane2)) ** 2) ** 0.5
+        s3_plane2 = math.cos(theta_uv_plane2) / (math.cos(theta_uv_plane2) ** 2 + (self.pv / self.pu * math.sin(theta_uv_plane2)) ** 2) ** 0.5
+        t11_plane2 = s2_plane2 / math.sin(theta_uv_plane2) - s2_plane2 * math.sin(theta_uv_plane2) * (1 - (self.pu / self.pv) ** 2)
+        t12_plane2 = 0
+        t21_plane2 = self.pu * self.pv * (puv_plane2 - self.u0 * math.cos(theta_uv_plane2) + self.v0 * math.sin(theta_uv_plane2)) / (self.f * ((self.pv * math.sin(theta_uv_plane2)) ** 2 + (self.pu * math.cos(theta_uv_plane2)) ** 2) ** 0.5) \
+              + self.pu * self.pv * (puv_plane2 - self.u0 * math.sin(theta_uv_plane2) - self.v0 * math.cos(theta_uv_plane2)) * (self.pu - self.pv) * math.sin(theta_uv_plane2) * math.cos(theta_uv_plane2) \
+              / (self.f * ((self.pv * math.sin(theta_uv_plane2)) ** 2 + (self.pu * math.cos(theta_uv_plane2)) ** 2) **1.5)
+        t22_plane2 = self.pu * self.pv / (self.f * ((self.pv * math.sin(theta_uv_plane2)) **2 + (self.pu * math.cos(theta_uv_plane2)) ** 2) ** 0.5)
+        line_jacob1_plane2 = [t11_plane2,t12_plane2,t21_plane2,t22_plane2]
+
+        s3_new_plane2 = abs(s3_plane2)
+        abs_judge = s3_new_plane2 / s3_plane2
+        s1_plane2 = s1_plane2 / abs_judge
+        s2_plane2 = s2_plane2 / abs_judge
+        p2_plane2 = s1_plane2
+        theta2_plane2 = math.asin(s2_plane2)
+
+        # p2 = s1; % sin(theta2) = s2; % cos(theta2) = s3;
+
+        # define line_jacob2
+        m1_plane2 = p2_plane2 * A34 - math.sin(theta2_plane2) * A14 - math.cos(theta2_plane2) * A24
+        m2_plane2 = A11 * math.sin(theta2_plane2) + A21 * math.cos(theta2_plane2) - A31 * p2_plane2
+        m3_plane2 = A12 * math.sin(theta2_plane2) + A22 * math.cos(theta2_plane2) - A32 * p2_plane2
+
+
+        n11_plane2 = (m2_plane2 / (m3_plane2 * (m2_plane2 ** 2 + m3_plane2 ** 2)) - 1 / m3_plane2) * (A11 * math.cos(theta2_plane2) - A21 * math.sin(theta2_plane2)) + m2_plane2 / (m3_plane2 * (m2_plane2 ** 2 + m3_plane2 ** 2)) * (A12 * math.cos(theta2_plane2) - A22 * math.sin(theta2_plane2))
+        n12_plane2 = (m2_plane2 / (m3_plane2 * (m2_plane2 ** 2 + m3_plane2 ** 2)) - 1 / m3_plane2) * (-A31) + m2_plane2 / (m3_plane2 * (m2_plane2 ** 2 + m3_plane2 ** 2)) * (-A32)
+        n21_plane2 = (m2_plane2 **2 + m3_plane2 ** 2) ** (-0.5) * (-(A14 * math.cos(theta2_plane2) - A24 * math.sin(theta2_plane2))) - m1_plane2 * ((m2_plane2 ** 2 + m3_plane2 ** 2) ** (-1.5)) * (A11 * math.cos(theta2_plane2) - A21 * math.sin(theta2_plane2)) - m1_plane2 * ((m2_plane2 **2 + m3_plane2 ** 2) **(-1.5)) * (A11 * math.cos(theta2_plane2) - A21 * math.sin(theta2_plane2))
+        n22_plane2 = (m2_plane2 ** 2 + m3_plane2 ** 2) ** (-0.5) * A34 - m1_plane2 * ((m2_plane2 ** 2 + m3_plane2 ** 2) ** (-1.5)) * (-A31) + m2_plane2 / (m3_plane2 * (m2_plane2 ** 2 + m3_plane2 ** 2)) * (-A32)
+
+        line_jacob2 = [n11_plane2,n12_plane2,n21_plane2,n22_plane2]
+
+
+        m2_new_plane2 = m2_plane2
+        m2_plane2 = abs(m2_plane2)
+        abs_judge = m2_new_plane2 / m2_plane2
+        m1_plane2 = m1_plane2 / abs_judge
+        m3_plane2 = m3_plane2 / abs_judge
+        p3 = m1_plane2 / math.sqrt(m2_plane2 * m2_plane2 + m3_plane2 * m3_plane2)
+        theta3_plane2 = math.asin(m3_plane2 / math.sqrt(m2_plane2 * m2_plane2 + m3_plane2 * m3_plane2))

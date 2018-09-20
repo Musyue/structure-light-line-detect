@@ -1,0 +1,208 @@
+clc,clear
+% simulation of ros program using matlab
+%subscribe line paramters of desired line and laser line
+n_uv=2;
+u1_desire=200; v1_desire=300;
+u2_desire=300; v2_desire=100;
+u1=200;v1=200;
+u2=300;v2=100;
+a_uv_desire_plane1=(n_uv*(u1_desire*v1_desire+u2_desire*v2_desire)-(u1_desire+u2_desire)*(v1_desire+v2_desire))/(n_uv*(u1_desire^2+u2_desire^2)-(u1_desire+u2_desire)^2);
+b_uv_desire_plane1=(v1_desire+v2_desire)/n_uv-a_uv_desire_plane1*(u1_desire+u2_desire)/n_uv;
+a_uv_plane1=(n_uv*(u1*v1+u2*v2)-(u1+u2)*(v1+v2))/(n_uv*(u1^2+u2^2)-(u1+u2)^2);
+b_uv_plane1=(v1+v2)/n_uv-a_uv_plane1*(u1+u2)/n_uv;
+
+puv_plane1=b_uv_plane1/sqrt(a_uv_plane1^2+1);
+theta_uv_plane1=asin(-a_uv_plane1/sqrt(a_uv_plane1^2+1));
+puv_desire_plane1=b_uv_desire_plane1/sqrt(a_uv_desire_plane1^2+1);
+theta_uv_desire_plane1=asin(-a_uv_desire_plane1/sqrt(a_uv_desire_plane1^2+1));
+
+%---------------------------------------------------------
+u3_desire=200; v3_desire=300;
+u4_desire=300; v4_desire=100;
+u3=200;v3=200;
+u4=300;v4=100;
+a_uv_desire_plane2=(n_uv*(u3_desire*v3_desire+u4_desire*v4_desire)-(u3_desire+u4_desire)*(v3_desire+v4_desire))/(n_uv*(u3_desire^2+u4_desire^2)-(u3_desire+u4_desire)^2);
+b_uv_desire_plane2=(v3_desire+v4_desire)/n_uv-a_uv_desire_plane2*(u3_desire+u4_desire)/n_uv;
+a_uv_plane2=(n_uv*(u3*v3+u4*v4)-(u3+u4)*(v3+v4))/(n_uv*(u3^2+u4^2)-(u3+u4)^2);
+b_uv_plane2=(v3+v4)/n_uv-a_uv_plane2*(u3+u4)/n_uv;
+
+puv_plane2=b_uv_plane2/sqrt(a_uv_plane2^2+1);
+theta_uv_plane2=asin(-a_uv_plane2/sqrt(a_uv_plane2^2+1));
+puv_desire_plane2=b_uv_desire_plane2/sqrt(a_uv_desire_plane2^2+1);
+theta_uv_desire_plane2=asin(-a_uv_desire_plane2/sqrt(a_uv_desire_plane2^2+1));
+
+%--------------------------------------------------------
+% input intrinic parameters of camera
+u0=321.237;v0=228.900;alpha=0.0;
+f=799.2035*1e-03; pu= 9.9377e-04; pv= 9.9029e-04;
+% input convergence parameter
+lamda=5; delta_t=0.01; n=5000; i=1;
+% input 4x4 T matrix of reflection plate with respect to camera frame
+
+T1= [ 0.5685   -0.7033   -0.4269    0.0974;
+    -0.5357   -0.7103    0.4567    0.1034;
+    -0.6244   -0.0310   -0.7805    0.5306;
+    0         0         0      1.0000];
+
+A11=T1(1,1);A12=T1(1,2);A14=T1(1,4);
+A21=T1(2,1);A22=T1(2,2);A24=T1(2,4);
+A31=T1(3,1);A32=T1(3,2);A34=T1(3,4);
+rot_T1=T1(1:3,1:3);
+tran_T1=T1(1:3,4);
+invT1=zeros(4,4);
+invT1(1:3,1:3)=rot_T1';
+invT1(1:3,4)=-rot_T1'*tran_T1;
+invT1(4,4)=1;
+invA11=invT1(1,1);invA12=invT1(1,2);invA13=invT1(1,3);invA14=invT1(1,4);
+invA21=invT1(2,1);invA22=invT1(2,2);invA23=invT1(2,3);invA24=invT1(2,4);
+invA31=invT1(3,1);invA32=invT1(3,2);invA33=invT1(3,3);invA34=invT1(3,4);
+
+% plane 2 function
+T_1_to_2=[0  1  0  0;
+    0  0  1  0;
+    1  0  0  0;
+    0  0  0  1];
+T2=T_1_to_2*T1;
+B11=T2(1,1);B12=T2(1,2);B14=T2(1,4);
+B21=T2(2,1);B22=T2(2,2);B24=T2(2,4);
+B31=T2(3,1);B32=T2(3,2);B34=T2(3,4);
+rot_T2=T2(1:3,1:3);
+tran_T2=T2(1:3,4);
+invT2=zeros(4,4);
+invT2(1:3,1:3)=rot_T2';
+invT2(1:3,4)=-rot_T2'*tran_T2;
+invT2(4,4)=1;
+invB11=invT2(1,1);invB12=invT2(1,2);invB13=invT2(1,3);invB14=invT2(1,4);
+invB21=invT2(2,1);invB22=invT2(2,2);invB23=invT2(2,3);invB24=invT2(2,4);
+invB31=invT2(3,1);invB32=invT2(3,2);invB33=invT2(3,3);invB34=invT2(3,4);
+
+for t=0:delta_t:delta_t*0
+
+    % define line_jacob1_plane1
+    s1_plane1= (puv_plane1-u0*sin(theta_uv_plane1)-v0*cos(theta_uv_plane1))*pu*pv/(f*((pv*sin(theta_uv_plane1))^2+(pu*cos(theta_uv_plane1))^2)^0.5);
+    s2_plane1= sin(theta_uv_plane1)/(sin(theta_uv_plane1)^2+(pu/pv*cos(theta_uv_plane1))^2)^0.5;
+    s3_plane1= cos(theta_uv_plane1)/(cos(theta_uv_plane1)^2+(pv/pu*sin(theta_uv_plane1))^2)^0.5;
+    t11_plane1= s2_plane1/sin(theta_uv_plane1)-s2_plane1*sin(theta_uv_plane1)*(1-(pu/pv)^2);
+    t12_plane1= 0;
+    t21_plane1= pu*pv*(puv_plane1-u0*cos(theta_uv_plane1)+v0*sin(theta_uv_plane1))/(f*((pv*sin(theta_uv_plane1))^2+(pu*cos(theta_uv_plane1))^2)^0.5)+pu*pv*(puv_plane1-u0*sin(theta_uv_plane1)-v0*cos(theta_uv_plane1))*(pu-pv)*sin(theta_uv_plane1)*cos(theta_uv_plane1)/(f*((pv*sin(theta_uv_plane1))^2+(pu*cos(theta_uv_plane1))^2)^1.5);
+    t22_plane1= pu*pv/(f*((pv*sin(theta_uv_plane1))^2+(pu*cos(theta_uv_plane1))^2)^0.5);
+
+    s3_plane1_new=abs(s3_plane1);
+    abs_judge=s3_plane1_new/s3_plane1;
+    s1_plane1=s1_plane1/abs_judge;
+    s2_plane1=s2_plane1/abs_judge;
+    p2_plane1=s1_plane1;
+    theta2_plane1=asin(s2_plane1);
+
+    % define line_jacob2_plane1
+    m1_plane1=p2_plane1*A34-sin(theta2_plane1)*A14-cos(theta2_plane1)*A24;
+    m2_plane1=A11*sin(theta2_plane1)+A21*cos(theta2_plane1)-A31*p2_plane1;
+    m3_plane1=A12*sin(theta2_plane1)+A22*cos(theta2_plane1)-A32*p2_plane1;
+
+    n11_plane1=(m2_plane1/(m3_plane1*(m2_plane1^2+m3_plane1^2))-1/m3_plane1)*(A11*cos(theta2_plane1)-A21*sin(theta2_plane1))+m2_plane1/(m3_plane1*(m2_plane1^2+m3_plane1^2))*(A12*cos(theta2_plane1)-A22*sin(theta2_plane1));
+    n12_plane1=(m2_plane1/(m3_plane1*(m2_plane1^2+m3_plane1^2))-1/m3_plane1)*(-A31)+m2_plane1/(m3_plane1*(m2_plane1^2+m3_plane1^2))*(-A32);
+    n21_plane1=(m2_plane1^2+m3_plane1^2)^(-0.5)*(-(A14*cos(theta2_plane1)-A24*sin(theta2_plane1)))-m1_plane1*((m2_plane1^2+m3_plane1^2)^(-1.5))*(A11*cos(theta2_plane1)-A21*sin(theta2_plane1))-m1_plane1*((m2_plane1^2+m3_plane1^2)^(-1.5))*(A11*cos(theta2_plane1)-A21*sin(theta2_plane1));
+    n22_plane1=(m2_plane1^2+m3_plane1^2)^(-0.5)*A34-m1_plane1*((m2_plane1^2+m3_plane1^2)^(-1.5))*(-A31)+m2_plane1/(m3_plane1*(m2_plane1^2+m3_plane1^2))*(-A32);
+
+    m2_plane1_new=m2_plane1;
+    m2_plane1=abs(m2_plane1);
+    abs_judge=m2_plane1_new/m2_plane1;
+    m1_plane1=m1_plane1/abs_judge;
+    m3_plane1=m3_plane1/abs_judge;
+    p3_plane1=m1_plane1/sqrt(m2_plane1*m2_plane1+m3_plane1*m3_plane1);
+    theta3_plane1=asin(m3_plane1/sqrt(m2_plane1*m2_plane1+m3_plane1*m3_plane1));
+
+    % define line_jacob1_plane2
+    s1_plane2= (puv_plane2-u0*sin(theta_uv_plane2)-v0*cos(theta_uv_plane2))*pu*pv/(f*((pv*sin(theta_uv_plane2))^2+(pu*cos(theta_uv_plane2))^2)^0.5);
+    s2_plane2= sin(theta_uv_plane2)/(sin(theta_uv_plane2)^2+(pu/pv*cos(theta_uv_plane2))^2)^0.5;
+    s3_plane2= cos(theta_uv_plane2)/(cos(theta_uv_plane2)^2+(pv/pu*sin(theta_uv_plane2))^2)^0.5;
+    t11_plane2= s2_plane2/sin(theta_uv_plane2)-s2_plane2*sin(theta_uv_plane2)*(1-(pu/pv)^2);
+    t12_plane2= 0;
+    t21_plane2= pu*pv*(puv_plane2-u0*cos(theta_uv_plane2)+v0*sin(theta_uv_plane2))/(f*((pv*sin(theta_uv_plane2))^2+(pu*cos(theta_uv_plane2))^2)^0.5)+pu*pv*(puv_plane2-u0*sin(theta_uv_plane2)-v0*cos(theta_uv_plane2))*(pu-pv)*sin(theta_uv_plane2)*cos(theta_uv_plane2)/(f*((pv*sin(theta_uv_plane2))^2+(pu*cos(theta_uv_plane2))^2)^1.5);
+    t22_plane2= pu*pv/(f*((pv*sin(theta_uv_plane2))^2+(pu*cos(theta_uv_plane2))^2)^0.5);
+
+    s3_plane2_new=abs(s3_plane2);
+    abs_judge=s3_plane2_new/s3_plane2;
+    s1_plane2=s1_plane2/abs_judge;
+    s2_plane2=s2_plane2/abs_judge;
+    p2_plane2=s1_plane2;
+    theta2_plane2=asin(s2_plane2);
+    % define line_jacob2_plane2
+    m1_plane2=p2_plane2*B34-sin(theta2_plane2)*B14-cos(theta2_plane2)*B24;
+    m2_plane2=B11*sin(theta2_plane2)+B21*cos(theta2_plane2)-B31*p2_plane2;
+    m3_plane2=B12*sin(theta2_plane2)+B22*cos(theta2_plane2)-B32*p2_plane2;
+    n11_plane2=(m2_plane2/(m3_plane2*(m2_plane2^2+m3_plane2^2))-1/m3_plane2)*(B11*cos(theta2_plane2)-B21*sin(theta2_plane2))+m2_plane2/(m3_plane2*(m2_plane2^2+m3_plane2^2))*(B12*cos(theta2_plane2)-B22*sin(theta2_plane2));
+    n12_plane2=(m2_plane2/(m3_plane2*(m2_plane2^2+m3_plane2^2))-1/m3_plane2)*(-B31)+m2_plane2/(m3_plane2*(m2_plane2^2+m3_plane2^2))*(-B32);
+    n21_plane2=(m2_plane2^2+m3_plane2^2)^(-0.5)*(-(B14*cos(theta2_plane2)-B24*sin(theta2_plane2)))-m1_plane2*((m2_plane2^2+m3_plane2^2)^(-1.5))*(B11*cos(theta2_plane2)-B21*sin(theta2_plane2))-m1_plane2*((m2_plane2^2+m3_plane2^2)^(-1.5))*(B11*cos(theta2_plane2)-B21*sin(theta2_plane2));
+    n22_plane2=(m2_plane2^2+m3_plane2^2)^(-0.5)*B34-m1_plane2*((m2_plane2^2+m3_plane2^2)^(-1.5))*(-B31)+m2_plane2/(m3_plane2*(m2_plane2^2+m3_plane2^2))*(-B32);
+
+    m2_plane2_new=m2_plane2;
+    m2_plane2=abs(m2_plane2);
+    abs_judge=m2_plane2_new/m2_plane2;
+    m1_plane2=m1_plane2/abs_judge;
+    m3_plane2=m3_plane2/abs_judge;
+    p3_plane2=m1_plane2/sqrt(m2_plane2*m2_plane2+m3_plane2*m3_plane2);
+    theta3_plane2=asin(m3_plane2/sqrt(m2_plane2*m2_plane2+m3_plane2*m3_plane2));
+
+    % compute all line jacob matrix
+    line_jacob1_plane1=[t11_plane1 t12_plane1;
+        t21_plane1 t22_plane1];
+    line_jacob2_plane1=[n11_plane1 n12_plane1;
+        n21_plane1 n22_plane1];
+    line_jacob1_plane2=[t11_plane2 t12_plane2;
+        t21_plane2 t22_plane2];
+    line_jacob2_plane2=[n11_plane2 n12_plane2;
+        n21_plane2 n22_plane2];
+
+    line_jacob_plane1=line_jacob2_plane1*line_jacob1_plane1;
+    line_jacob_plane2=line_jacob2_plane2*line_jacob1_plane2;
+
+    line_jacob21=zeros(3,3);
+
+    line_jacob21(1:2,1:2)=line_jacob_plane1;
+    line_jacob21(3,3)=line_jacob_plane2(1,1);
+
+    % define line_jacob3
+    line_jacob3 = [ 0    0   0    0   0     -1;
+        -1    0   0    0   0      0;
+        0    0   0   -1   0      0];
+
+    % compute overall jacobian matrix and its inverse jacobian matrix
+    A=line_jacob3;
+    [U,S,V] = svd(A);
+    B = diag(S);
+    [Height Width] = size(S);
+    B(1:rank(A),:)=1./B(1:rank(A),:);
+    S1 = diag(B);
+    if Height > Width
+        S2 = [S1;zeros(Height-Width,Width)]';
+    else
+        S2 = [S1 zeros(Height,Width-Height)]';
+    end
+    C = V*S2*U';
+    inv_line_jacob3 = C;
+
+    % % start computing velocity of reflection frame 1 2
+
+    delta_theta_plane1=theta_uv_plane1-theta_uv_desire_plane1;
+    delta_puv_plane1=puv_plane1-puv_desire_plane1;
+    delta_theta_plane2=theta_uv_plane2-theta_uv_desire_plane2;
+
+    inv_total_jacob=inv_line_jacob3*line_jacob21;
+
+    vel_refelection=-lamda*inv_total_jacob*[delta_theta_plane1 delta_puv_plane1  delta_theta_plane2]';
+    vx1=vel_refelection(1)*cos(theta3_plane1);
+    vy1=vel_refelection(1)*sin(theta3_plane1);
+    vz1=vel_refelection(3);
+    wx1=vel_refelection(4);
+    wy1=vel_refelection(5);
+    wz1=vel_refelection(6);
+    i=i+1;
+end
+
+
+
+
+
+
+

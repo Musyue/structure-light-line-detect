@@ -1,0 +1,139 @@
+% simulation of ros program using matlab
+%subscribe line paramters of desired line and laser line
+n_uv=2;
+u1_desire=415; v1_desire=291;
+u2_desire=503; v2_desire=290;
+u1=420;v1=331;
+u2=519;v2=321;
+a_uv_desire=(n_uv*(u1_desire*v1_desire+u2_desire*v2_desire)-(u1_desire+u2_desire)*(v1_desire+v2_desire))/(n_uv*(u1_desire^2+u2_desire^2)-(u1_desire+u2_desire)^2)
+b_uv_desire=(v1_desire+v2_desire)/n_uv-a_uv_desire*(u1_desire+u2_desire)/n_uv
+a_uv=(n_uv*(u1*v1+u2*v2)-(u1+u2)*(v1+v2))/(n_uv*(u1^2+u2^2)-(u1+u2)^2)
+b_uv=(v1+v2)/n_uv-a_uv*(u1+u2)/n_uv;
+
+puv=b_uv/sqrt(a_uv^2+1);
+theta_uv=asin(-a_uv/sqrt(a_uv^2+1));
+puv_desire=b_uv_desire/sqrt(a_uv_desire^2+1);
+theta_uv_desire=asin(-a_uv_desire/(a_uv_desire^2+1));
+%--------------------------------------------------------
+% input intrinic parameters of camera
+u0=321.237;v0=228.900;alpha=0.0;
+f=799.2035*1e-03; pu= 9.9377e-04; pv= 9.9029e-04;
+% input initial estimation of laser position in world frame
+x4_laser_ref=1; y4_laser_ref=2; z4_laser_ref=3;
+% input convergence parameter
+lamda=5; delta_t=0.01; n=5000; i=1;
+% input 4x4 T matrix of reflection plate with respect to camera frame
+T1= [ 0.5685   -0.7033   -0.4269    0.0974;
+     -0.5357   -0.7103    0.4567    0.1034;
+     -0.6244   -0.0310   -0.7805    0.5306;
+         0         0         0      1.0000];
+A11=T1(1,1);A12=T1(1,2);A14=T1(1,4);
+A21=T1(2,1);A22=T1(2,2);A24=T1(2,4);
+A31=T1(3,1);A32=T1(3,2);A34=T1(3,4);
+rot_T1=T1(1:3,1:3);
+tran_T1=T1(1:3,4);
+invT1=zeros(4,4);
+invT1(1:3,1:3)=rot_T1';
+invT1(1:3,4)=-rot_T1'*tran_T1;
+invT1(4,4)=1;
+invA11=invT1(1,1);invA12=invT1(1,2);invA13=invT1(1,3);invA14=invT1(1,4);
+invA21=invT1(2,1);invA22=invT1(2,2);invA23=invT1(2,3);invA24=invT1(2,4);
+invA31=invT1(3,1);invA32=invT1(3,2);invA33=invT1(3,3);invA34=invT1(3,4);
+
+delta_theta=theta_uv-theta_uv_desire;
+delta_puv=puv-puv_desire;
+line_p3=zeros(n+1,1);
+line_theta3=zeros(n+1,1);
+for t=0:delta_t:delta_t*n
+    % while (abs(delta_theta)&&abs(delta_puv)>=0.01)
+    % define line_jacob1
+    s1= (puv-u0*sin(theta_uv)-v0*cos(theta_uv))*pu*pv/(f*((pv*sin(theta_uv))^2+(pu*cos(theta_uv))^2)^0.5);
+    s2= sin(theta_uv)/(sin(theta_uv)^2+(pu/pv*cos(theta_uv))^2)^0.5;
+    s3= cos(theta_uv)/(cos(theta_uv)^2+(pv/pu*sin(theta_uv))^2)^0.5;
+    t11= s2/sin(theta_uv)-s2*sin(theta_uv)*(1-(pu/pv)^2);
+    t12= 0;
+    t21= pu*pv*(puv-u0*cos(theta_uv)+v0*sin(theta_uv))/(f*((pv*sin(theta_uv))^2+(pu*cos(theta_uv))^2)^0.5)+pu*pv*(puv-u0*sin(theta_uv)-v0*cos(theta_uv))*(pu-pv)*sin(theta_uv)*cos(theta_uv)/(f*((pv*sin(theta_uv))^2+(pu*cos(theta_uv))^2)^1.5);
+    t22= pu*pv/(f*((pv*sin(theta_uv))^2+(pu*cos(theta_uv))^2)^0.5);
+    line_jacob1=[t11 t12;
+        t21 t22];
+    s3_new=abs(s3);
+    abs_judge=s3_new/s3;
+    s1=s1/abs_judge;
+    s2=s2/abs_judge;
+    p2=s1;
+    theta2=asin(s2);
+
+
+    % p2=s1; % sin(theta2)=s2; % cos(theta2)=s3;
+    % define line_jacob2
+
+    m1=p2*A34-sin(theta2)*A14-cos(theta2)*A24;
+    m2=A11*sin(theta2)+A21*cos(theta2)-A31*p2;
+    m3=A12*sin(theta2)+A22*cos(theta2)-A32*p2;
+    n11=(m2/(m3*(m2^2+m3^2))-1/m3)*(A11*cos(theta2)-A21*sin(theta2))+m2/(m3*(m2^2+m3^2))*(A12*cos(theta2)-A22*sin(theta2));
+    n12=(m2/(m3*(m2^2+m3^2))-1/m3)*(-A31)+m2/(m3*(m2^2+m3^2))*(-A32);
+    n21=(m2^2+m3^2)^(-0.5)*(-(A14*cos(theta2)-A24*sin(theta2)))-m1*((m2^2+m3^2)^(-1.5))*(A11*cos(theta2)-A21*sin(theta2))-m1*((m2^2+m3^2)^(-1.5))*(A11*cos(theta2)-A21*sin(theta2));
+    n22=(m2^2+m3^2)^(-0.5)*A34-m1*((m2^2+m3^2)^(-1.5))*(-A31)+m2/(m3*(m2^2+m3^2))*(-A32);
+    line_jacob2=[n11 n12;
+        n21 n22];
+    m2_new=abs(m2);
+    m2=abs(m2);
+    abs_judge=m2_new/m2;
+    m1=m1/abs_judge;
+    m3=m3/abs_judge;
+    p3=m1/sqrt(m2*m2+m3*m3);
+    theta3=asin(m3/sqrt(m2*m2+m3*m3));
+
+
+    % p3=m1/sqrt(m2*m2+m3*m3); % cos(theta3)=m2/(m2*m2+m3*m3);% sin(theta3)=m3/(m2*m2+m3*m3);
+    % define line_jacob3
+
+    line_p3(i)=p3;
+    line_theta3(i)=theta3;
+
+    % lenda=(cos(theta3)*x4_laser_ref+sin(theta3)*y4_laser_ref-p3)/z4_laser_ref;
+    % line_jacob3=[     0           0         0    -lenda*(cos(theta3))     -lenda*sin(theta3)    -1;
+    %    -cos(theta3) -sin(theta3) lenda  lenda*sin(theta3)*p3     -lenda*cos(theta3)*p3  0];
+
+    line_jacob3 = [ 0    0   0    0   0     -1;
+                   -1    0   0    0   0     0];
+
+    % compute overall jacobian matrix and its inverse jacobian matrix
+    % total_jacob=inv(line_jacob2*line_jacob1)*line_jacob3;
+    A=line_jacob3;
+    [U,S,V] = svd(A);
+    B = diag(S);
+    [Height Width] = size(S);
+    B(1:rank(A),:)=1./B(1:rank(A),:);
+    S1 = diag(B);
+    if Height > Width
+        S2 = [S1;zeros(Height-Width,Width)]';
+    else
+        S2 = [S1 zeros(Height,Width-Height)]';
+    end
+    C = V*S2*U';
+    inv_line_jacob3 = C;
+    inv_total_jacob=inv_line_jacob3*line_jacob2*line_jacob1;
+
+    % start computing velocity of reflection frame 1 2
+    delta_theta=theta_uv-theta_uv_desire;
+    delta_puv=puv-puv_desire;
+    vel_refelection=-lamda*inv_total_jacob*[delta_theta delta_puv]';
+    vx1=vel_refelection(1)*cos(theta3);
+    vy1=vel_refelection(1)*sin(theta3);
+    vz1=vel_refelection(3);
+    wx1=vel_refelection(4);
+    wy1=vel_refelection(5);
+    wz1=vel_refelection(6);
+    i=i+1;
+    % publish velocity of reflection plate
+    % [vx vy vz wx wy wz]
+    % end
+end
+
+
+
+
+
+
+
